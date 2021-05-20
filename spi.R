@@ -16,8 +16,8 @@ x <- t(x)
 # Parameters
 s <- 1
 kern.s <- 0.8
-B <- 0.001
-b <- 2
+B <- 2
+b <- 0
 
 # Semi-parametric regression
 K <- rbf(x, x, kern.s)
