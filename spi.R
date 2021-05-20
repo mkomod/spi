@@ -11,49 +11,37 @@ x <- as.matrix(seq(0, 10, length.out=n))
 y <- x %*% theta.true + f.true(x) + rnorm(n, 0, 1)
 
 plot(x, y)
+x <- t(x)
 
-
-# prior parameters
-# likelihood
+# Parameters
 s <- 1
-# beta
-m.0 <- 0
-s.0 <- 1
-# f
-K <- rbf(x, x, 0.1)
-K.y <- K + s * diag(length(x))
-C.f <- K - K %*% solve(K.y) %*% K
+kern.s <- 0.8
+B <- 0.001
+b <- 2
 
-# init values
-theta <- rnorm(1)
-f <- t(rmvnorm(1, rep(0, n), K))
+# Semi-parametric regression
+K <- rbf(x, x, kern.s)
+K.y <- (K + s * diag(rep(1, n)))
+x.star <- x
+K.sx <- rbf(x.star, x, kern.s)
+K.xs <- rbf(x, x.star, kern.s)
+K.ss <- rbf(x.star, x.star, kern.s)
 
-N <- 1e3
-THETA <- matrix(0, nrow=1, ncol=N)
-FUN <- matrix(0, nrow=n, ncol=N)
 
-# sample beta
-for (iter in 1:N) {
-    # update theta
-    x.bar <- mean(x %*% theta + f)
-    s.1 <- (1/s.0^2 + n/s^2)^(-1/2)
-    m.1 <- s.1^2 * (m.0/s.0^2 + n*x.bar/s^2)
-    theta <- rnorm(1, m.1, s.1)
+theta <- solve(solve(B) + x %*% solve(K.y) %*% t(x)) %*% 
+	(x %*% solve(K.y) %*% y + solve(B) %*% b)
+R <- x.star - x %*% solve(K.y) %*% K.sx
+M.f <- t(x.star) %*% theta + K.sx %*% solve(K.y) %*% (y - t(x) %*% theta)
+C.f <- K.ss - K.sx %*% solve(K.y) %*% K.xs + t(R) %*% 
+    solve(solve(B) + x %*% solve(K.y) %*% t(x)) %*% R
 
-    # update f
-    # M.f <- (x %*% theta + f) + K %*% solve(K.y) %*% (y - (x %*% theta + f))
-    for (i in 1:N) {
-	M.f <- x.bar[i] %*% theta 
-	+ K[ , i] %*% solve(K.y) %*% y
-	f[i] <- t(rmvnorm(1, M.f, C.f))
-    }
+f.s <- rmvnorm(1000, M.f, C.f)
+f.m <- apply(f.s, 2, mean)
+f.u <- apply(f.s, 2, function(x) quantile(x, probs=0.95))
+f.l <- apply(f.s, 2, function(x) quantile(x, probs=0.05))
 
-    # save
-    THETA[ , iter] <- theta
-    FUN[ , iter] <- f
-}
-
-plot(density(THETA[1, ]))
-mean(THETA[1, ])
-matplot(FUN, type="l")
+plot(x, y)
+lines(x, f.m)
+lines(x, f.u)
+lines(x, f.l)
 
